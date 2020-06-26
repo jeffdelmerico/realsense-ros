@@ -629,6 +629,7 @@ void BaseRealSenseNode::getParameters()
     _pnh.param("angular_velocity_cov", _angular_velocity_cov, static_cast<double>(0.01));
     _pnh.param("hold_back_imu_for_frames", _hold_back_imu_for_frames, HOLD_BACK_IMU_FOR_FRAMES);
     _pnh.param("publish_odom_tf", _publish_odom_tf, PUBLISH_ODOM_TF);
+    _pnh.param("publish_odom_as_child_of_pose_frame", _publish_odom_as_child_of_pose_frame, false);
 }
 
 void BaseRealSenseNode::setupDevice()
@@ -1374,15 +1375,30 @@ void BaseRealSenseNode::pose_callback(rs2::frame frame)
     static tf2_ros::TransformBroadcaster br;
     geometry_msgs::TransformStamped msg;
     msg.header.stamp = t;
-    msg.header.frame_id = _odom_frame_id;
-    msg.child_frame_id = _frame_id[POSE];
-    msg.transform.translation.x = pose_msg.pose.position.x;
-    msg.transform.translation.y = pose_msg.pose.position.y;
-    msg.transform.translation.z = pose_msg.pose.position.z;
-    msg.transform.rotation.x = pose_msg.pose.orientation.x;
-    msg.transform.rotation.y = pose_msg.pose.orientation.y;
-    msg.transform.rotation.z = pose_msg.pose.orientation.z;
-    msg.transform.rotation.w = pose_msg.pose.orientation.w;
+    if(_publish_odom_as_child_of_pose_frame) 
+    {
+        msg.header.frame_id = _frame_id[POSE];
+	msg.child_frame_id = _odom_frame_id;
+        msg.transform.translation.x = -pose_msg.pose.position.x;
+        msg.transform.translation.y = -pose_msg.pose.position.y;
+        msg.transform.translation.z = -pose_msg.pose.position.z;
+        msg.transform.rotation.x = -pose_msg.pose.orientation.x;
+        msg.transform.rotation.y = -pose_msg.pose.orientation.y;
+        msg.transform.rotation.z = -pose_msg.pose.orientation.z;
+        msg.transform.rotation.w = pose_msg.pose.orientation.w;
+    }
+    else 
+    {
+        msg.header.frame_id = _odom_frame_id;
+        msg.child_frame_id = _frame_id[POSE];
+        msg.transform.translation.x = pose_msg.pose.position.x;
+        msg.transform.translation.y = pose_msg.pose.position.y;
+        msg.transform.translation.z = pose_msg.pose.position.z;
+        msg.transform.rotation.x = pose_msg.pose.orientation.x;
+        msg.transform.rotation.y = pose_msg.pose.orientation.y;
+        msg.transform.rotation.z = pose_msg.pose.orientation.z;
+        msg.transform.rotation.w = pose_msg.pose.orientation.w;
+    }
 
     if (_publish_odom_tf) br.sendTransform(msg);
 
