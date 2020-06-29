@@ -1,4 +1,5 @@
 #include "../include/base_realsense_node.h"
+#include <eigen_conversions/eigen_msg.h>
 #include "assert.h"
 #include <boost/algorithm/string.hpp>
 #include <algorithm>
@@ -1363,14 +1364,18 @@ void BaseRealSenseNode::pose_callback(rs2::frame frame)
     double elapsed_camera_ms = (/*ms*/ frame_time - /*ms*/ _camera_time_base) / 1000.0;
     ros::Time t(_ros_time_base.toSec() + elapsed_camera_ms);
 
-    geometry_msgs::PoseStamped pose_msg;
-    pose_msg.pose.position.x = -pose.translation.z;
-    pose_msg.pose.position.y = -pose.translation.x;
-    pose_msg.pose.position.z = pose.translation.y;
-    pose_msg.pose.orientation.x = -pose.rotation.z;
-    pose_msg.pose.orientation.y = -pose.rotation.x;
-    pose_msg.pose.orientation.z = pose.rotation.y;
-    pose_msg.pose.orientation.w = pose.rotation.w;
+    geometry_msgs::Pose pose_msg;
+    pose_msg.position.x = -pose.translation.z;
+    pose_msg.position.y = -pose.translation.x;
+    pose_msg.position.z = pose.translation.y;
+    pose_msg.orientation.x = -pose.rotation.z;
+    pose_msg.orientation.y = -pose.rotation.x;
+    pose_msg.orientation.z = pose.rotation.y;
+    pose_msg.orientation.w = pose.rotation.w;
+    Eigen::Affine3d pose_eigen;
+    tf::poseMsgToEigen(pose_msg, pose_eigen);
+    geometry_msgs::Pose pose_inverse_msg;
+    tf::poseEigenToMsg(pose_eigen.inverse(), pose_inverse_msg);
 
     static tf2_ros::TransformBroadcaster br;
     geometry_msgs::TransformStamped msg;
@@ -1378,26 +1383,26 @@ void BaseRealSenseNode::pose_callback(rs2::frame frame)
     if(_publish_odom_as_child_of_pose_frame) 
     {
         msg.header.frame_id = _frame_id[POSE];
-	msg.child_frame_id = _odom_frame_id;
-        msg.transform.translation.x = -pose_msg.pose.position.x;
-        msg.transform.translation.y = -pose_msg.pose.position.y;
-        msg.transform.translation.z = -pose_msg.pose.position.z;
-        msg.transform.rotation.x = -pose_msg.pose.orientation.x;
-        msg.transform.rotation.y = -pose_msg.pose.orientation.y;
-        msg.transform.rotation.z = -pose_msg.pose.orientation.z;
-        msg.transform.rotation.w = pose_msg.pose.orientation.w;
+    	msg.child_frame_id = _odom_frame_id;
+        msg.transform.translation.x = pose_inverse_msg.position.x;
+        msg.transform.translation.y = pose_inverse_msg.position.y;
+        msg.transform.translation.z = pose_inverse_msg.position.z;
+        msg.transform.rotation.x = pose_inverse_msg.orientation.x;
+        msg.transform.rotation.y = pose_inverse_msg.orientation.y;
+        msg.transform.rotation.z = pose_inverse_msg.orientation.z;
+        msg.transform.rotation.w = pose_inverse_msg.orientation.w;
     }
     else 
     {
         msg.header.frame_id = _odom_frame_id;
         msg.child_frame_id = _frame_id[POSE];
-        msg.transform.translation.x = pose_msg.pose.position.x;
-        msg.transform.translation.y = pose_msg.pose.position.y;
-        msg.transform.translation.z = pose_msg.pose.position.z;
-        msg.transform.rotation.x = pose_msg.pose.orientation.x;
-        msg.transform.rotation.y = pose_msg.pose.orientation.y;
-        msg.transform.rotation.z = pose_msg.pose.orientation.z;
-        msg.transform.rotation.w = pose_msg.pose.orientation.w;
+        msg.transform.translation.x = pose_msg.position.x;
+        msg.transform.translation.y = pose_msg.position.y;
+        msg.transform.translation.z = pose_msg.position.z;
+        msg.transform.rotation.x = pose_msg.orientation.x;
+        msg.transform.rotation.y = pose_msg.orientation.y;
+        msg.transform.rotation.z = pose_msg.orientation.z;
+        msg.transform.rotation.w = pose_msg.orientation.w;
     }
 
     if (_publish_odom_tf) br.sendTransform(msg);
@@ -1433,7 +1438,14 @@ void BaseRealSenseNode::pose_callback(rs2::frame frame)
         odom_msg.child_frame_id = _frame_id[POSE];
         odom_msg.header.stamp = t;
         odom_msg.header.seq = _seq[stream_index];
-        odom_msg.pose.pose = pose_msg.pose;
+        if(_publish_odom_as_child_of_pose_frame)
+        {
+            odom_msg.pose.pose = pose_inverse_msg;
+        }
+        else
+        {
+            odom_msg.pose.pose = pose_msg;
+        }
         odom_msg.pose.covariance = {cov_pose, 0, 0, 0, 0, 0,
                                     0, cov_pose, 0, 0, 0, 0,
                                     0, 0, cov_pose, 0, 0, 0,

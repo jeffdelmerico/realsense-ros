@@ -17,6 +17,7 @@ find_package(catkin REQUIRED COMPONENTS
     tf
     ddynamic_reconfigure
     diagnostic_updater
+    eigen_conversions
     )
 
 if(BUILD_WITH_OPENMP)
@@ -81,6 +82,7 @@ catkin_package(
     image_transport
     ddynamic_reconfigure
     nav_msgs
+    eigen_conversions
     )
 
 add_library(${PROJECT_NAME}
